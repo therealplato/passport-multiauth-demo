@@ -1,0 +1,34 @@
+extends layout
+block append head 
+  script
+    validateForm = function(){
+      p1 = document.forms['newuser']['password'].value
+      p2 = document.forms['newuser']['password2'].value
+      if(p1 != p2) { alert('Passwords don\'t match'); return false };
+    }
+block append content
+  if(logged_in_user)
+    p Welcome, #{logged_in_user.handle}
+  p Create New User:
+  form(name='newuser', action='/auth/createuser', method='post',
+       onsubmit="return validateForm()")
+    input(type='text', name='handle', placeholder='user')
+    input(type='text', name='password', placeholder='pwd')
+    input(type='text', name='password2', placeholder='pwd again')
+    input(type='submit', value='Create User')
+  hr
+  p Log In:
+  form(name='login', action='/auth/start/password', method='post')
+    input(type='text', name='handle', placeholder='user')
+    input(type='text', name='password', placeholder='pwd')
+    input(type='submit', value='Login')
+  hr
+  a(href='/auth/start/google') Login with Google
+  hr
+  a(href='/auth/logout') Logout
+    
+  if(all_users.length > 0) 
+    p Current Users:
+    each line in all_users
+      tt=JSON.stringify(line, null, 2)
+      br
