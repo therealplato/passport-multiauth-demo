@@ -6,7 +6,7 @@ block prepend content
   if(dupe)
     p 
     | We tried to make a Google account for you with username 
-    | <span class='red'>{#suggestion}</span> but that's 
+    | <span class='red'>#{user.google.handle}</span> but that's 
     | <strong>already in use</strong>. 
     p
     | If that's your account, <em>and</em> 
@@ -15,7 +15,7 @@ block prepend content
     | Google account. What a pain, we know, we're sorry, it's on our todo
     | list...
     p
-    | If <span class='red'>#{suggestion}</span> isn't you, or 
+    | If <span class='red'>#{user.google.handle}</span> isn't you, or 
     | it's you but you want this to be a separate account, please enter a 
     | different username below.
 
@@ -27,6 +27,6 @@ block prepend content
     | We need a handle that our other users will see. Here's our suggestion 
     | taken from your Google email, feel free to change it:
 
-    form(action='/auth/google/paperwork/verify', method='post')
-      input(name='confirmedHandle', type="textarea", value=suggestion)
-      input(type='submit', name='Use this handle')
+  form(action='/auth/google/paperwork/verify', method='post')
+    input(name='confirmedHandle', type="textarea", value=suggestion)
+    input(type='submit', name='Use this handle')
