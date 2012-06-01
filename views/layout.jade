@@ -3,6 +3,17 @@ html
 head
   block head
     link(rel='stylesheet', href='/stylesheets/style.css')
+    style
+      li {display:inline;margin-right:20px;}
 body
   block content
-
+    hr
+    ul
+      li
+        a(href='/') index
+      li
+        a(href='/account') account
+      li
+        a(href='/auth/logout') logout
+    hr
+    

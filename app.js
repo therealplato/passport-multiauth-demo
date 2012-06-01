@@ -1,8 +1,5 @@
-// Cuizini food app rewrite alpha
-// Copyright 2012 Cuizini 
-
-// Read in some modules from other js files. Async for control flow, passport
-// and crypto for authentication, express for web server, nano for db
+// Read in some modules from other js files. passport and crypto 
+// for authentication, express for web server
 var passport = require('passport');
 var express  = require('express');
 var crypto   = require('crypto');
@@ -10,47 +7,57 @@ var crypto   = require('crypto');
 var app      = module.exports = express.createServer();
 
 //store users locally as an array of objects; irl you'd use a database
-var users = [];
+var USERS = [];
 
 newUser = function() {
   data = 
   {
     handle: null,
     email:  null,
-    google_id: null,
-    twitter_id: null,
+    google: {id:null, email:null},
+    twitter: {id:null, email:null},
     salt: null,
     hash: null
   };
   return data;
 };
 
+userByHandle = function(handle) {
+  var toReturn = null;
+  USERS.forEach(function(user) {
+    if(user.handle==handle) {
+      console.log('found '+user.handle);
+      toReturn=user;
+    };
+  });
+  if(toReturn == null) {
+    console.log('didnt find '+handle);
+    return null;
+  } else {
+    return toReturn;
+  };
+};
+
 // Authentication: who is this request coming from?
 // Passport uses one Strategy for each auth type. local = username/pass
 var LocalStrategy = require('passport-local').Strategy;
 var GoogleStrategy = require('passport-google').Strategy;
+var TwitterStrategy = require('passport-twitter').Strategy;
 
 // passport will use these functions to convert sessionid <=> user
+// IRL you'd talk to your database before calling done(err,id) / done(err,user)
 passport.serializeUser(function(user, done) {
   done(null, user.handle);
 });
 
 passport.deserializeUser(function(handle, done) {
   console.log('deserializing user '+handle);
-  console.log(JSON.stringify(users,null,2));
-  var toReturn = null;
-  users.forEach(function(user) {
-    if(user.handle==handle) {
-      console.log('found it');
-//      return done(null, user);
-      toReturn=user;
-    };
-  });
-  if(toReturn == null) {
-    console.log('didnt find it');
+//  console.log(JSON.stringify(USERS,null,2));
+  user = userByHandle(handle);
+  if(user == null) {
     return done(new Error('not found'));
   } else {
-    return done(null, toReturn);
+    return done(null, user);
   };
 });
 
@@ -60,17 +67,15 @@ passport.deserializeUser(function(handle, done) {
 // cb(null, false) if auth fails gracefully 
 // cb(null, user) if auth succeeds
 // cb(err) if exception occurs
-// local: check if a u/p is good then cb
 
+// local: check if a u/p is good then cb
 passport.use(new LocalStrategy(
-  { usernameField:'handle', passwordField:'password' }
+  { 
+    usernameField:'handle', 
+    passwordField:'password'
+  }
  ,function(username, password, done) {
-    var user = null;
-    users.forEach( function(thisuser) {
-      if(thisuser.handle == username) {
-        user = thisuser; 
-      };
-    }); // if thisuser was found, user will be non-null
+    var user = userByHandle(username);
     if(user == null) 
       { return done(null, false, {message: 'Bad username or password'}) };
     //keep going otherwise
@@ -86,41 +91,106 @@ passport.use(new LocalStrategy(
   }
 )); //end of passport.use() localstrategy
 
-passport.use(new GoogleStrategy(
-  { returnURL: 'http://localhost:3000/auth/done/google',
-    realm: 'http://localhost:3000/' }
-  , function(g_id, profile, done) {
-    console.log('id: '+g_id);
-// we'll truncate the google id from e.g. 
-// https://www.google.com/accounts/o8/id?id=tOawmBGNa0fg6xXOUjBEYeT-WiYObtDE
-    g_id_regex = /id=(.*)$/;      // capture url param id
-    match_id = g_id_regex.exec(g_id);    // run the regex
-    g_id2 = match_id[1];              // g_id2 will be saved as qz_googleid
-    console.log('id2: '+g_id2);
-    console.log('profile:\n'+JSON.stringify(profile));
+passport.use('google', new GoogleStrategy(
+  { returnURL: 'http://localhost:3000/auth/google/callback',
+    realm: 'http://localhost:3000/'
+  },function(g_id, profile, done) {
+    g_id2 = new RegExp(/id=(.*)$/).exec(g_id)[1]; // capture trailing id param
+
+    // Check if this account is already attached to a user
     var user = null;
-    users.forEach(function(thisuser) {
-      if(thisuser.google_id==g_id2) {
-        user = thisuser;
-      };
-    });
-
-    if(user != null) { return done(null, user) };
-    // otherwise, we have no user associated with this google account yet
+    USERS.forEach(function(thisuser) {
+      if(thisuser.google.id==g_id2) {  user = thisuser;  };
+    });  
     
-    email = profile.emails[0].value;
-    handle_regex = /^(.*)@/;      // capture chars before @
-    match_handle = handle_regex.exec(email);
-    handle2 = match_handle[1];
+    // If we find one, login as that user
+    if(user != null) { return done(null, user) }; // 
+    
+    // otherwise, we have no user associated with this google account yet...
+    var tmpuser    = newUser();
+    var email      = profile.emails[0].value;
+    tmpuser.handle = g_id2;    // we need a tmp handle to maintain a session
+    tmpuser.google = {id:null, email:null, handle:null}; 
+    tmpuser.google.handle = new RegExp(/^(.*)@/).exec(email)[1];
+    tmpuser.google.email  = email;
+    tmpuser.google.id     = g_id2;
+    tmpuser._ISNEW = true;
+    USERS.push(tmpuser);
+    return done(null, tmpuser);     
+    // We have to push tmpuser into USERS now because subsequent paperwork
+    // needs a session, and the session de/serializer checks USERS
+  } //end of google_link verification function
+)); //end of passport.use()
 
-    user = newUser();
-    user.email = email;
-    user.handle = handle2;
-    user.google_id = g_id2;
-    users.push(user);
-    return done(null, user);
-  } //end of google verification function
-)); //end of passport.use() googlestrategy
+passport.use('google_link', new GoogleStrategy(
+  { returnURL: 'http://localhost:3000/auth/link/google/done',
+    realm: 'http://localhost:3000/',
+    passReqToCallback: true
+  },function(req, g_id, profile, done) {
+    if(!req.user) {
+      console.log('google_link called without a req.user in session');
+      return done(null, false);  //this is only to be used by a logged in user
+    }; 
+
+    // Check if this account is already attached to a user
+    var user = null;
+/*    g_id_regex = /id=(.*)$/;      // capture id param from url
+    match_id = g_id_regex.exec(g_id);    // run the regex
+    g_id2 = match_id[1];                 // remember the captured string
+*/
+    g_id2 = /id=(.*)$/.exec(g_id)[1]; // g_id2 will be the 1st captured string
+    USERS.forEach(function(thisuser) {
+      if(thisuser.google.id==g_id2) {  user = thisuser;  };
+    });  
+    
+    // we shouldn't find one - this is an attempt to link a new account
+    if(user != null) { return done(null, false) }; // 
+    
+    // otherwise, we have no user associated with this google account yet...
+    var account = {id:null, email:null}; 
+    account.email = profile.emails[0].value;
+    account.id = g_id2;
+    return done(null, account);     // route will add this to req.user
+  } //end of google_link verification function
+)); //end of passport.use()
+
+passport.use('twitter_link', new TwitterStrategy(
+  { consumerKey: 'GFG7a5tt7XiVvR55OJM4Wg',
+    consumerSecret: 'Gdaw3xmZEbaV6dMtgBgK5uoAVNkZIDdgNqUse52JlbM',
+    callbackURL: 'http://127.0.0.1:3000/auth/link/twitter/done',
+  },function(token, tokenSecret, profile, done) {
+    console.log('twitter_link, req=\n'+JSON.stringify(req));
+    if(!req.user) {
+      console.log('twitter_link called without a req.user in session');
+      return done(null, false);  //this is only to be used by a logged in user
+    }; 
+
+    // Check if this account is already attached to a user
+    var user = null;
+/*    g_id_regex = /id=(.*)$/;      // capture id param from url
+    match_id = g_id_regex.exec(g_id);    // run the regex
+    g_id2 = match_id[1];                 // remember the captured string
+*/
+    console.log(JSON.stringify(profile,null,2));
+    t_id = profile.id
+    new RegExp(/id=(.*)$/).exec(g_id)[1]; // g_id2 will be the 1st captured string
+    USERS.forEach(function(thisuser) {
+      if(thisuser.twitter.id == t_id) {  user = thisuser;  };
+    });  
+    
+    // we shouldn't find one - this is an attempt to link a new account
+    if(user != null) { return done(null, false) }; // 
+    
+    // otherwise, we have no user associated with this twitter account yet...
+    var account = {id:null, email:null}; 
+//    handle_regex = /^(.*)@/;      // capture chars before @
+//    match_handle = handle_regex.exec(email);
+//    handle2 = match_handle[1];
+    account.email = profile.emails[0].value;
+    account.id = t_id;
+    return done(null, account);     // route will add this to req.user
+  } //end of twitter_link verification function
+)); //end of passport.use()
 
 
 
@@ -143,103 +213,151 @@ app.configure(function(){
 // ROUTES
 //  app.get('/auth/start*', function
 
-  app.get( '/', function(req, res) {
-    console.log('session:\n'+JSON.stringify(req.session,null,2));
-    console.log('users:\n'+JSON.stringify(users,null,2));
-    var user=null;
-    if(req.user) { user = req.user };
-    res.render('index', {logged_in_user:user, all_users:users});
-  });
+app.get( '/', function(req, res) {
+  console.log('\'/\' called');
+  console.log('session:\n'+JSON.stringify(req.session,null,2));
+  console.log('users:\n'+JSON.stringify(USERS,null,2));
+  var user=null;
+  if(req.user) { user = req.user };
+  res.render('index', {logged_in_user:user, all_users:USERS});
+});
 
-  app.post( '/auth/start/password'
-  , passport.authenticate( 'local'
-    , { successRedirect: '/auth/success',
-        failureRedirect: '/auth/failure'  }
-    )
-  );
+app.post( '/auth/password/start'
+, passport.authenticate( 'local'
+  , { successRedirect: '/auth/success',
+      failureRedirect: '/auth/failure'  }
+  )
+);
 
-  app.get( '/auth/start/google', passport.authenticate('google') );
 
-  app.get( '/auth/done/google'
-  , passport.authenticate( 'google'
-    , { successRedirect: '/auth/success',
-        failureRedirect: '/auth/failure'  }
-    )
-  );
 
-  app.get( '/auth/success' , function(req,res) {
-    console.log('in /auth/success');
-    res.render('success', {logged_in_user:req.user});
-//    res.send('Login succeeded as user ' + req.user.handle, 200);
-  });
 
-  app.get( '/auth/failure' , function(req, res) {
-    res.render('failure');
-//    res.send('Login failed', 500);
-  });
-/*  app.post( '/auth/createuser', function(req,res,next) {
-    if(req.user){
-      req.logOut();
-      next();
+app.get( '/auth/google/start', passport.authenticate('google') );
+app.get( '/auth/google/callback'
+, passport.authenticate( 'google', { failureRedirect: '/auth/failure'  })
+, function(req, res){
+    // passport.auth('google') set a req.user for us
+    console.log('passport verified google auth, now in /auth/google/callback');
+    console.log('req.user:\n'+JSON.stringify(req.user,null,2));
+    console.log('req.session:\n'+JSON.stringify(req.session,null,2));
+    if(req.user._ISNEW) {
+    // the session has a tmp req.user, with req.user.handle set to google's id
+      console.log('about to redirect to /auth/google/paperwork' +
+        ' from /auth/google/callback');
+      res.redirect('/auth/google/paperwork');
+    } else {
+      res.redirect('/auth/success');
     };
-  });*/
+  }
+);
 
-  app.post( '/auth/createuser', function(req, res) {
-    console.log('req.session is\n'+JSON.stringify(req.session,null,2));
-    var user = newUser();
-    console.log('user.handle will be '+req.body.handle);
-    user.handle = req.body.handle;
-    // we can't reuse the same hasher
-    var sha256er = crypto.createHash('sha256');
-    crypto.randomBytes(33, function(err, buffer){
-      if(!err) { 
-        var salt = buffer.toString('hex');
-        user.salt = salt;
-        toHash = req.body.password.concat(salt);
-        sha256er.update(toHash,'utf8');
-        hash = sha256er.digest('hex');
-        user.hash = hash;
-        users.push(user);
-        console.log('logging in '+user.handle);
-    
-//        if(req.user) { req.logOut()};
-       /* 
-        req.session.regenerate(function(err){
-          if(!err) {
-            req.logIn(user, function(err) {
-              if(err) {
-                res.send('Error starting session for '+user.handle)}
-              else { 
-                console.log('req.session is\n'+JSON.stringify(req.session,null,2));
-                res.render('createduser', {logged_in_user:req.user.handle})
-              };
-            });
-          } else {
-            res.redirect('/');
-          };
-        });
-       */
-         
-        req.logIn(user, function(err) {
-          if(err) {
-            res.send('Error starting session for '+user.handle)}
-          else { 
-            console.log('req.session is\n'+JSON.stringify(req.session,null,2));
-            res.render('createduser', {logged_in_user:req.user.handle})
-          };
-        });
-        
-      } else { 
-        res.send('Error adding user '+req.body.handle+':\n'+err,500);
-      };
-    });
-  });  //end of app.post('/auth/createuser',fn(){})
+// the 'google' verify callback redirects here if it created a new user
+app.get('/auth/google/paperwork', function(req, res) {
+  // We stored the new user in USERS with a _ISNEW flag
+  console.log('foo');
+  console.log('got to paperwork with session:\n'+JSON.stringify(req.session,null,2));
+  if(userByHandle(req.user.google.handle) == null) {
+    var dupe = false;
+    var suggestion = req.user.google.handle;
+  } else {
+    var dupe = true;
+    var i=1;
+    while(true){
+      var tmp = userByHandle(req.user.google.handle + i);
+      if(tmp) { i++; continue; } else { break };
+    };
+    var suggestion = req.user.google.handle + i;
+  };
+  console.log('about to render paperwork-google');
+  res.render('paperwork-google', 
+    {dupe:dupe, suggestion:suggestion});
+});
 
-  app.get( '/auth/logout' , function(req, res) {
-    req.logOut();
-    req.session.destroy();
-    res.render('logout');
+// paperwork.jade submits a form to this verify url:
+app.post('/auth/google/paperwork/verify', function(req, res) {
+  if(req.body.confirmedHandle == (null || '')) {
+    console.log('someone submitted a blank handle form');
+    res.redirect('/auth/google/paperwork');
+  } else if(userByHandle(req.body.confirmedHandle != null)) {
+    console.log('Aw shit, someone already has that handle');
+    res.redirect('/auth/google/paperwork');
+  } else {
+    // overwrite tmp handle with user's choice
+// might break session... passport uses user.handle to de/serialize
+//    var realuser = userByHandle(req.user.handle);
+//    console.log('same thing? '+(realuser == req.user));
+//    delete realuser._ISNEW;
+    console.log('session before regen:\n'+JSON.stringify(req.session,null,2));
+//    req.session.reload(function(err) {
+      req.user.handle = req.body.confirmedHandle;
+      delete req.user._ISNEW;
+      req.logIn(req.user, function(err) {
+        console.log('session after regen and login:\n'+JSON.stringify(req.session,null,2));
+        if(!err) {res.redirect('/auth/google/paperwork/done');}
+        else { res.send(JSON.stringify(err),500);};
+      });
+//    });
+  };
+});
+
+app.get('/auth/google/paperwork/done', function(req,res) {
+  console.log('in paperwork/done, session:\n'+JSON.stringify(req.session,null,2));
+  res.render('paperwork-google-done', {user:req.user});
+});
+
+app.get( '/auth/link/google', passport.authorize('google_link') );
+
+app.get( '/auth/link/google/done' 
+  , passport.authorize('google_link', {failureRedirect:'/auth/failure'})
+  , function(req, res) { // if we got here then auth succeeded
+      var user = req.user;  //this is the same user who was logged in before
+      var google = req.account;
+      user.google = google;
+      delete req.account;
+      res.redirect( '/auth/success' );
   });
+
+app.get( '/auth/link/twitter', passport.authorize('twitter_link') );
+
+app.get( '/auth/link/twitter/done' 
+  , passport.authorize('twitter_link', {failureRedirect:'/auth/failure'})
+  , function(req, res) { // if we got here then auth succeeded
+    console.log('in callback of /auth/link/twitter/done');
+      var user = req.user;  //this is the same user who was logged in before
+      var twitter = req.account;
+      user.twitter = twitter;
+      delete req.account;
+      res.redirect( '/auth/success' );
+  });
+app.get( '/auth/success' , function(req,res) {
+  console.log('in /auth/success');
+  res.render('success', {logged_in_user:req.user});
+//    res.send('Login succeeded as user ' + req.user.handle, 200);
+});
+
+app.get( '/auth/failure' , function(req, res) {
+  res.render('failure');
+//    res.send('Login failed', 500);
+});
+/*  app.post( '/auth/createuser', function(req,res,next) {
+  if(req.user){
+    req.logOut();
+    next();
+  };
+});*/
+
+app.post( '/auth/createuser', function(req, res) {
+  create_user(req,res,function(){
+    
+  })
+});  //end of app.post('/auth/createuser',fn(){})
+
+
+app.get( '/auth/logout' , function(req, res) {
+  req.logOut();
+  req.session.destroy();
+  res.render('logout');
+});
 
 
 
@@ -250,6 +368,46 @@ app.configure('development', function(){
   app.use(express.errorHandler({ dumpExceptions: true, showStack: true }));
 });
 
+
+
 // **START LISTENING on configured port... incoming requests go to middleware chain**
 app.listen(3000);
 console.log("Server listening on port %d", app.address().port);
+
+
+
+// long functions go here
+create_user = function(req, res) {
+  console.log('req.session is\n'+JSON.stringify(req.session,null,2));
+  var user = newUser();
+  console.log('user.handle will be '+req.body.handle);
+  user.handle = req.body.handle;
+  // we can't reuse the same hasher
+  var sha256er = crypto.createHash('sha256');
+  crypto.randomBytes(33, function(err, buffer){
+    if(!err) { 
+      var salt = buffer.toString('hex');
+      user.salt = salt;
+      toHash = req.body.password.concat(salt);
+      sha256er.update(toHash,'utf8');
+      hash = sha256er.digest('hex');
+      user.hash = hash;
+      USERS.push(user);
+      console.log('logging in '+user.handle);
+  
+//        if(req.user) { req.logOut()};
+       
+      req.logIn(user, function(err) {
+        if(err) {
+          res.send('Error starting session for '+user.handle)}
+        else { 
+          console.log('req.session is\n'+JSON.stringify(req.session,null,2));
+          res.render('createduser', {logged_in_user:req.user.handle})
+        };
+      });
+      
+    } else { 
+      res.send('Error adding user '+req.body.handle+':\n'+err,500);
+    };
+  });
+}; //end of create_user definition

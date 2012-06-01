@@ -6,9 +6,37 @@ block append head
       p2 = document.forms['newuser']['password2'].value
       if(p1 != p2) { alert('Passwords don\'t match'); return false };
     }
-block append content
+block prepend content
   if(logged_in_user)
+    - twitter = logged_in_user.twitter.id ? true : false;
+    - google = logged_in_user.google.id ? true : false;
     p Welcome, #{logged_in_user.handle}
+    if(twitter)
+      p Your account is associated with Twitter ID #{logged_in_user.twitter.id}
+    if(google)
+      p Your account is associated with Google ID #{logged_in_user.google.id}
+    if(!twitter || !google)
+      p Link a new account:
+    if(!twitter)
+      a(href='/auth/link/twitter') Link a Twitter account to account #{logged_in_user.handle}
+      br
+    if(!google)
+      a(href='/auth/link/google') Link a Google account to account #{logged_in_user.handle}
+      br
+    hr
+    a(href='/auth/logout') Logout
+  if(!logged_in_user)
+    p Log In:
+    form(name='login', action='/auth/password/start', method='post')
+      input(type='text', name='handle', placeholder='user')
+      input(type='text', name='password', placeholder='pwd')
+      input(type='submit', value='Login')
+    hr
+    ul
+      li
+        a(href='/auth/google/start') Login with Google
+      li
+        a(href='/auth/start/twitter') Login with Twitter
   p Create New User:
   form(name='newuser', action='/auth/createuser', method='post',
        onsubmit="return validateForm()")
@@ -17,15 +45,6 @@ block append content
     input(type='text', name='password2', placeholder='pwd again')
     input(type='submit', value='Create User')
   hr
-  p Log In:
-  form(name='login', action='/auth/start/password', method='post')
-    input(type='text', name='handle', placeholder='user')
-    input(type='text', name='password', placeholder='pwd')
-    input(type='submit', value='Login')
-  hr
-  a(href='/auth/start/google') Login with Google
-  hr
-  a(href='/auth/logout') Logout
     
   if(all_users.length > 0) 
     p Current Users:
