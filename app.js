@@ -486,6 +486,7 @@ console.log("Server listening on port %d", app.address().port);
 
 
 // long functions go here
+// NOTE create_user isn't checking for duplicate handles
 create_user = function(req, res) {
   console.log('req.session is\n'+JSON.stringify(req.session,null,2));
   var user = newUser();
