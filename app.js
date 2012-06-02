@@ -16,8 +16,8 @@ newUser = function() {
   {
     handle: null,
     email:  null,
-    google: {id:null, email:null},
-    twitter: {id:null, email:null},
+    google: {id:null, handle:null, email:null},
+    twitter: {id:null, handle:null},
     salt: null,
     hash: null
   };
@@ -98,8 +98,8 @@ passport.use(new LocalStrategy(
 // Normal 'login with google' - 
 // sets req.user plus req.user._ISNEW flag, if no existing user found
 passport.use('google', new GoogleStrategy(
-  { returnURL: 'http://localhost:3000/auth/google/callback',
-    realm: 'http://localhost:3000/'
+  { returnURL: 'http://127.0.0.1:3000/auth/google/callback',
+    realm: 'http://127.0.0.1:3000/'
   },function(g_id, profile, done) {
     g_id2 = new RegExp(/id=(.*)$/).exec(g_id)[1]; // capture trailing id param
 
@@ -131,8 +131,8 @@ passport.use('google', new GoogleStrategy(
 // This is a separate verification function; it'll be called with 
 // passport.authorize instead of passport.authenticate, to keep old session
 passport.use('google_link', new GoogleStrategy(
-  { returnURL: 'http://localhost:3000/auth/link/google/callback',
-    realm: 'http://localhost:3000/',
+  { returnURL: 'http://127.0.0.1:3000/auth/link/google/callback',
+    realm: 'http://127.0.0.1:3000/',
     passReqToCallback: true
   },function(req, g_id, profile, done) {
     if(!req.user) {
@@ -205,15 +205,11 @@ passport.use('twitter_link', new TwitterStrategy(
       return done(null, false);  //this is only to be used by a logged in user
     }; 
 
+    console.log(JSON.stringify(profile,null,2));
     // Check if this account is already attached to a user
     var user = null;
-/*    g_id_regex = /id=(.*)$/;      // capture id param from url
-    match_id = g_id_regex.exec(g_id);    // run the regex
-    g_id2 = match_id[1];                 // remember the captured string
-*/
-    console.log(JSON.stringify(profile,null,2));
-    t_id = profile.id
-    new RegExp(/id=(.*)$/).exec(g_id)[1]; // g_id2 will be the 1st captured string
+    t_id = profile.id;
+    //new RegExp(/id=(.*)$/).exec(g_id)[1]; // g_id2 will be the 1st captured string
     USERS.forEach(function(thisuser) {
       if(thisuser.twitter.id == t_id) {  user = thisuser;  };
     });  
@@ -222,12 +218,13 @@ passport.use('twitter_link', new TwitterStrategy(
     if(user != null) { return done(null, false) }; // 
     
     // otherwise, we have no user associated with this twitter account yet...
-    var account = {id:null, email:null}; 
+    var account = {id:null, handle:null}; 
 //    handle_regex = /^(.*)@/;      // capture chars before @
 //    match_handle = handle_regex.exec(email);
 //    handle2 = match_handle[1];
-    account.email = profile.emails[0].value;
+//    account.email = profile.emails[0].value;
     account.id = t_id;
+    account.handle = profile.username;
     return done(null, account);     // route will add this to req.user
   } //end of twitter_link verification function
 )); //end of passport.use()
