@@ -8,35 +8,24 @@ block append head
     }
 block prepend content
   if(logged_in_user)
-    - twitter = logged_in_user.twitter.id ? true : false;
     - google = logged_in_user.google.id ? true : false;
     p Welcome, #{logged_in_user.handle}
-    if(twitter)
-      p Your account is associated with Twitter ID #{logged_in_user.twitter.id}
     if(google)
       p Your account is associated with Google ID #{logged_in_user.google.id}
-    if(!twitter || !google)
-      p Link a new account:
-    if(!twitter)
-      a(href='/auth/link/twitter') Link a Twitter account to account #{logged_in_user.handle}
-      br
     if(!google)
       a(href='/auth/link/google') Link a Google account to account #{logged_in_user.handle}
       br
     hr
-    a(href='/auth/logout') Logout
   if(!logged_in_user)
-    p Log In:
-    form(name='login', action='/auth/password/start', method='post')
-      input(type='text', name='handle', placeholder='user')
-      input(type='text', name='password', placeholder='pwd')
-      input(type='submit', value='Login')
-    hr
-    ul
-      li
-        a(href='/auth/google/start') Login with Google
-      li
-        a(href='/auth/twitter/start') Login with Twitter
+    div.w50
+      p Log In:
+      form(name='login', action='/auth/password/start', method='post')
+        input(type='text', name='handle', placeholder='user')
+        input(type='text', name='password', placeholder='pwd')
+        input(type='submit', value='Login')
+    div.w50
+      a(href='/auth/google/start') Login with Google
+    div.clear
   p Create New User:
   form(name='newuser', action='/auth/createuser', method='post',
        onsubmit="return validateForm()")
@@ -48,6 +37,7 @@ block prepend content
     
   if(all_users.length > 0) 
     p Current Users:
+    ul
     each line in all_users
-      tt=JSON.stringify(line, null, 2)
-      br
+      li
+        pre=JSON.stringify(line, null, 2)

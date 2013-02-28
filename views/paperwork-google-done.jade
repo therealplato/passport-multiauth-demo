@@ -7,4 +7,4 @@ block prepend content
   | Welcome! Your account, <span class='green'>#{user.handle}</span>, has been created.
   | Here's the contents of your user object:
   br
-  tt=JSON.stringify(user, null, 2)
+  pre #{JSON.stringify(user, null, 2)}

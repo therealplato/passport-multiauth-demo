@@ -5,18 +5,15 @@ block append head
 block prepend content
   if(dupe)
     p 
-    | We tried to make a Google account for you with username 
-    | <span class='red'>#{user.google.handle}</span> but that's 
+    | The username 
+    | <span class='red'>#{tmpuser.google.handle}</span> is
     | <strong>already in use</strong>. 
     p
-    | If that's your account, <em>and</em> 
-    | you wanna use this Google account to log into it... you need to log out 
-    | of this one, log into that one, go to your account page, and link this 
-    | Google account. What a pain, we know, we're sorry, it's on our todo
-    | list...
+    | If you want to link this google account to that existing account,
+    | <a href='/login'>login</a> to that one and do it from your account page.
     p
     | If <span class='red'>#{user.google.handle}</span> isn't you, or 
-    | it's you but you want this to be a separate account, please enter a 
+    | it's you but you want this to be a separate account, please try a 
     | different username below.
 
   if(!dupe)    
@@ -25,8 +22,8 @@ block prepend content
     | <span class='red'>not saved</span> yet.
     p
     | We need a handle that our other users will see. Here's our suggestion 
-    | taken from your Google email, feel free to change it:
+    | taken from your Google profile, feel free to change it:
 
   form(action='/auth/google/paperwork/verify', method='post')
     input(name='confirmedHandle', type="textarea", value=suggestion)
-    input(type='submit', name='Use this handle')
+    input(type='submit', value='Use this handle')

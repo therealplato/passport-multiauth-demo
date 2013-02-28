@@ -3,7 +3,11 @@
   , "version": "0.0.1"
   , "private": true
   , "dependencies": {
-      "express": "2.5.8"
+      "express": "3.1.0"
+    , "crypto": "*"
     , "jade": ">= 0.0.1"
+    , "passport": "0.1.16"
+    , "passport-google-oauth": "0.1.5"
+    , "passport-local": "0.1.3"
   }
 }

@@ -1,8 +1,39 @@
-body {
-  padding: 50px;
-  font: 14px "Lucida Grande", Helvetica, Arial, sans-serif;
+@media (max-width:50em){
+  body{width:100%}
+}
+@media (min-width:50.01em){
+  body{width:48em; margin:auto; padding: 0 1em 0 1em;}
 }
 
+body {
+  font-family:"Lucida Grande", Helvetica, Arial, sans-serif;
+}
+#container{
+  background-color:#EEE;
+}
 a {
   color: #00B7FF;
 }
+p {margin:0 0 1em 0}
+li {
+  display:inline;margin-right:2em;
+}
+input{
+  display:block; margin-bottom:0.25em;
+}
+
+.w50{
+width:50%; 
+float:left;
+display:inline-block;
+}
+.w50 a{
+width:100%; 
+font-size:1.5em;
+text-align:center;
+height:4em; 
+line-height:4em; 
+display:inline-block;
+background-color: #FFAA55;
+}
+.clear{clear:both;}
